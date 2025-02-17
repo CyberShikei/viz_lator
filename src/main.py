@@ -1,9 +1,13 @@
+#!../venv/bin/python3
 import math
 import pygame
-from interface import Window, Pencil, play
+import subprocess
+import re
+from interface import Window, Pencil
+from graph import Graph
 
 TITLE = "Viz Lator"
-WIN_W = 800
+WIN_W = 1200
 WIN_H = 600
 
 DIV = 1
@@ -35,99 +39,115 @@ def check_tick(tick, inc=1):
 def toggle(bool_in):
     return not bool_in
 
-
-def sine_graph(amp, origin=(0, 0), rang=(0, 360), inc=1) -> list:
-    graph = []
-    count = 0
-    while count < rang[1]:
-        x = (int)(count + origin[0])
-        angle = math.radians(count)
-        y = (int)((math.sin(angle) * amp) + origin[1])
-        graph.append((x, y))
-        count += inc
-    return graph
+# function to replace . with , and convert to float
 
 
-def replace(cord1, cord2):
-    x_c1 = cord1[0]
-    x_c2 = cord2[0]
-    t_c1 = (x_c2, cord1[1])
-    t_c2 = (x_c1, cord2[1])
-    return t_c1, t_c2
+def convert_float(values: list):
+    new_values = []
+    for value in values:
+        try:
+            new_value = float(value)
+            new_values.append(new_value)
+        except ValueError:
+            pass
+    return new_values
 
 
-def shift(graph, pos=0):
-    if len(graph) == 0:
-        return graph
-    if pos == len(graph) - 1:
-        return graph
-    if pos == 0:
-        o_y = graph[0][1]
-        new_cord = (graph[-1][0], o_y)
-        graph[-1] = new_cord
+def check_color(value):
+    if value < 0:
+        value = value * -1
+    if value > 255:
+        value = 255
+    return value
 
-    # new_graph = []
-    # for i in range(len(graph) - 1):
-    n_y = graph[pos + 1][1]
-    new_cord = (graph[pos][0], n_y)
-    graph[pos] = new_cord
 
-    return shift(graph, pos + 1)
+def get_color(values):
+    values[0] = (values[0] * 255) * 20
+    values[1] = (values[1] % 255) * 4
+    values[2] = (values[2] % 255) / 2
+    color = (int)(check_color(values[0])), (int)(
+        check_color(values[1])), (int)(check_color(values[2]))
+    return color
 
-def shift_r(graph, amnt=1):
-    if amnt == 0:
-        return graph
-    result = shift(graph)
-    return shift_r(result, amnt - 1)
 
-def show_graph(graph):
-    cols = 5
-    count = 1
-    text = ""
-    for cord in graph:
-        if count % cols == 0:
-            print(text)
-            text = ""
-        else:
-            text += f"{cord},\t"
-        count += 1
-    print(len(graph))
+def throttle_data_stream(new_data, last_data, rate_of_change: float = 0.5, max=20):
+    if len(last_data) == 0:
+        return new_data
+
+    for i, item in enumerate(new_data):
+        l_val = last_data[i]
+        n_val = item
+
+        change = n_val - l_val
+        new_value = l_val + (change * rate_of_change)
+
+        if new_value > max:
+            new_value = max
+        if new_value < 0:
+            new_value = 0
+        new_data[i] = new_value
+        # print(f"last-item {last_data[i]} new-item {new_data[i]} change {change}")
+
+    return new_data
 
 
 def run(win):
+    proc = subprocess.Popen(
+        ["./audio_draw/target/debug/audio_draw"],
+        stdout=subprocess.PIPE,
+        text=True
+    )
+
     tick = 0
-    origin = (0, win.get_center()[1])
-    g_min = 0
-    g_max = win.width
-    g_width = (g_min, turn_deg(g_max * SPEED, TICK))
-    graph = sine_graph(AMP, origin, g_width, TICK)
+    origin = win.get_center()
+    w_min = origin[0]
+    w_max = win.width
+    g_width = (w_min, w_max)
+    h_min = origin[1]
+    h_max = win.height
+    g_height = (h_min, h_max)
+
+    last_data = []
+    graph = Graph([], origin, g_width, g_height, 1)
+    # graph = sine_graph(AMP, origin, g_width, TICK)
     # show_graph(graph)
     pencil = Pencil(win.screen, (255, 0, 0), 2)
-    while win.running:
-        # Clear screen
-        win.clear_screen()
+    if proc.stdout is not None:
+        for line in proc.stdout:
+            # Clear screen
+            win.clear_screen()
+            # print(line)
+            line = line.strip('"')
+            data = line.split(":")
+            meta_data = convert_float(data[1:])
+            # new_color = get_color(meta_data[1:])
+            # pencil.set_color(new_color)
 
-        # if draw_toggle:
-        # new_graph = play(pencil, tick, graph, SPEED, (g_min, g_max))
-        # graph = new_graph
-        play(pencil, tick, graph, SPEED, (g_min, g_max))
+            values = data[0].split(" ")  # Convert to integer
+            # dominant_freq_index = (int)(meta_data[0])
+            # dom_freq = (float)(values[dominant_freq_index])
+            # print(f"dominant freq: {dom_freq}")
 
-        # origin = (origin[0] + tick, origin[1])
-        # new_graph = sine_graph(AMP, origin, g_width, TICK)
-        new_graph = shift_r(graph, SPEED)
-        #print(tick/TICK)
-        #show_graph(new_graph[:TICK])
-        graph = new_graph
-
-        tick = check_tick(tick, TICK)
+            dec_vals = convert_float(values)
+            throttle = dec_vals #throttle_data_stream(dec_vals, last_data, 0.1, 7)
+            last_data = dec_vals
+            graph.set_graph(throttle)
+            #print(graph.get_graph())
+            pencil.draw_points(graph.graphic())
+            graph.mirror_y()
+            #pencil.draw_lines(graph.graphic())
+            graph.mirror_x()
+            pencil.draw_points(graph.graphic())
+            graph.mirror_xy()
+            #pencil.draw_lines(graph.graphic())
 
         # win.check_events()
-        for event in pygame.event.get():
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_q:
-                    win.running = False
-        pygame.display.flip()
-        win.clock.tick(win.fps)
+            for event in pygame.event.get():
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_q:
+                        break
+            pygame.display.flip()
+            # win.clock.tick(win.fps)
     pygame.quit()
     exit(0)
 
