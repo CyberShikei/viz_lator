@@ -34,14 +34,18 @@ class Pencil:
             # color = (0, y, 0)
             self.draw_point((point[0], point[1]), color)
 
-    def draw_lines(self, points, i=0):
+    def draw_lines_r(self, points, i=0, skip=1):
         pnts = points
         if len(pnts) == 0:
             return 0
-        if i == len(pnts) - 1:
+        if i == len(pnts) - skip:
             return 0
-        self.draw(pnts[i], pnts[i + 1])
-        return self.draw_lines(pnts, i + 1)
+        self.draw(pnts[i], pnts[i + skip])
+        return self.draw_lines_r(pnts, i + skip, skip)
+    
+    def draw_lines(self, points, skip=2):
+        for i in range(0, len(points) - 1, skip):
+            self.draw(points[i], points[i + 1])
 
     def set_color(self, color):
         if not color:

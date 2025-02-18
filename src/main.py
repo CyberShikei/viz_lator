@@ -99,14 +99,14 @@ def run(win):
     )
 
     tick = 0
-    origin = win.get_center()
+    origin = (0, win.get_center()[1])
     w_min = origin[0]
     w_max = win.width
     g_width = (w_min, w_max)
     h_min = origin[1]
     h_max = win.height
     g_height = (h_min, h_max)
-
+    resolution = 4
     last_data = []
     graph = Graph([], origin, g_width, g_height, 1)
     # graph = sine_graph(AMP, origin, g_width, TICK)
@@ -135,11 +135,11 @@ def run(win):
             #print(graph.get_graph())
             pencil.draw_points(graph.graphic())
             graph.mirror_y()
-            #pencil.draw_lines(graph.graphic())
-            graph.mirror_x()
-            pencil.draw_points(graph.graphic())
-            graph.mirror_xy()
-            #pencil.draw_lines(graph.graphic())
+            pencil.draw_lines_r(graph.graphic(), skip=resolution)
+            # graph.mirror_x()
+            # pencil.draw_points(graph.graphic())
+            # graph.mirror_xy()
+            # pencil.draw_lines_r(graph.graphic(), skip=resolution)
 
         # win.check_events()
             for event in pygame.event.get():

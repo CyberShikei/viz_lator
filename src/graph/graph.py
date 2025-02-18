@@ -16,7 +16,8 @@ class Graph:
         return average_list
 
     def get_graph(self) -> List[float]:
-        return self._average_graph()
+        #return self._average_graph()
+        return self._graph
 
     def _average_graph(self):
         return self._disolve_resolution()
